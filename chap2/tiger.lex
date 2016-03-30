@@ -5,7 +5,10 @@ val lineNum = ErrorMsg.lineNum
 val linePos = ErrorMsg.linePos
 fun err(p1,p2) = ErrorMsg.error p1
 
-fun eof() = let val pos = hd(!linePos) in Tokens.EOF(pos,pos) end
+val commentNestingLevel = ref 0
+
+fun checkNesting pos = if !commentNestingLevel > 0 then ErrorMsg.error pos "Expected '*/' but found EOF" else ()
+fun eof() = let val pos = hd(!linePos) in checkNesting pos; Tokens.EOF(pos,pos) end
 
 fun getEnd yypos yytext = yypos + (String.size yytext)
 fun getInt yypos string = case (Int.fromString string) of (SOME i) => i | NONE => ErrorMsg.impossible "could not convert string to int"
@@ -15,56 +18,62 @@ fun tokenPosVal yypos yytext = (yytext, yypos, getEnd yypos yytext)
 fun intToken yypos yytext = (getInt yypos yytext, yypos, getEnd yypos yytext)
 
 %% 
+%s COMMENT;
 %%
 
-[ \t]+ => (continue());
+<INITIAL>"/*" => (YYBEGIN COMMENT; commentNestingLevel := !commentNestingLevel + 1; continue());
+<COMMENT>"/*" => (commentNestingLevel := !commentNestingLevel + 1; continue());
+<COMMENT>"*/" => (commentNestingLevel := !commentNestingLevel - 1; if !commentNestingLevel = 0 then YYBEGIN INITIAL else (); continue());
+<COMMENT>. => (continue());
 
-"while" => (Tokens.WHILE (tokenPos yypos yytext));
-"for" => (Tokens.FOR (tokenPos yypos yytext));
-"to" => (Tokens.TO (tokenPos yypos yytext));
-"break" => (Tokens.BREAK (tokenPos yypos yytext));
-"let" => (Tokens.LET (tokenPos yypos yytext));
-"in" => (Tokens.IN (tokenPos yypos yytext));
-"end" => (Tokens.END (tokenPos yypos yytext));
-"function" => (Tokens.FUNCTION (tokenPos yypos yytext));
-"var" => (Tokens.VAR (tokenPos yypos yytext));
-"type" => (Tokens.TYPE (tokenPos yypos yytext));
-"array" => (Tokens.ARRAY (tokenPos yypos yytext));
-"if" => (Tokens.IF (tokenPos yypos yytext));
-"then" => (Tokens.THEN (tokenPos yypos yytext));
-"else" => (Tokens.ELSE (tokenPos yypos yytext));
-"do" => (Tokens.DO (tokenPos yypos yytext));
-"of" => (Tokens.OF (tokenPos yypos yytext));
-"nil" => (Tokens.NIL (tokenPos yypos yytext));
+<INITIAL>[ \t]+ => (continue());
+
+<INITIAL>"while" => (Tokens.WHILE (tokenPos yypos yytext));
+<INITIAL>"for" => (Tokens.FOR (tokenPos yypos yytext));
+<INITIAL>"to" => (Tokens.TO (tokenPos yypos yytext));
+<INITIAL>"break" => (Tokens.BREAK (tokenPos yypos yytext));
+<INITIAL>"let" => (Tokens.LET (tokenPos yypos yytext));
+<INITIAL>"in" => (Tokens.IN (tokenPos yypos yytext));
+<INITIAL>"end" => (Tokens.END (tokenPos yypos yytext));
+<INITIAL>"function" => (Tokens.FUNCTION (tokenPos yypos yytext));
+<INITIAL>"var" => (Tokens.VAR (tokenPos yypos yytext));
+<INITIAL>"type" => (Tokens.TYPE (tokenPos yypos yytext));
+<INITIAL>"array" => (Tokens.ARRAY (tokenPos yypos yytext));
+<INITIAL>"if" => (Tokens.IF (tokenPos yypos yytext));
+<INITIAL>"then" => (Tokens.THEN (tokenPos yypos yytext));
+<INITIAL>"else" => (Tokens.ELSE (tokenPos yypos yytext));
+<INITIAL>"do" => (Tokens.DO (tokenPos yypos yytext));
+<INITIAL>"of" => (Tokens.OF (tokenPos yypos yytext));
+<INITIAL>"nil" => (Tokens.NIL (tokenPos yypos yytext));
 
 \n	=> (lineNum := !lineNum+1; linePos := yypos :: !linePos; continue());
 
-","	=> (Tokens.COMMA (tokenPos yypos yytext));
-":"	=> (Tokens.COLON (tokenPos yypos yytext));
-";"	=> (Tokens.SEMICOLON (tokenPos yypos yytext));
-"("	=> (Tokens.LPAREN (tokenPos yypos yytext));
-")"	=> (Tokens.RPAREN (tokenPos yypos yytext));
-"["	=> (Tokens.LBRACE (tokenPos yypos yytext));
-"]"	=> (Tokens.RBRACE (tokenPos yypos yytext));
-"{"	=> (Tokens.LBRACK (tokenPos yypos yytext));
-"}"	=> (Tokens.RBRACK (tokenPos yypos yytext));
-"."	=> (Tokens.DOT (tokenPos yypos yytext));
-"+"	=> (Tokens.PLUS (tokenPos yypos yytext));
-"-"	=> (Tokens.MINUS (tokenPos yypos yytext));
-"*"	=> (Tokens.TIMES (tokenPos yypos yytext));
-"/"	=> (Tokens.DIVIDE (tokenPos yypos yytext));
-"="	=> (Tokens.EQ (tokenPos yypos yytext));
-"<>"	=> (Tokens.NEQ (tokenPos yypos yytext));
-"<"	=> (Tokens.LT (tokenPos yypos yytext));
-"<="	=> (Tokens.LE (tokenPos yypos yytext));
-">"	=> (Tokens.GT (tokenPos yypos yytext));
-">="	=> (Tokens.GE (tokenPos yypos yytext));
-"&"	=> (Tokens.AND (tokenPos yypos yytext));
-"|"	=> (Tokens.OR (tokenPos yypos yytext));
-":="	=> (Tokens.ASSIGN (tokenPos yypos yytext));
+<INITIAL>","	=> (Tokens.COMMA (tokenPos yypos yytext));
+<INITIAL>":"	=> (Tokens.COLON (tokenPos yypos yytext));
+<INITIAL>";"	=> (Tokens.SEMICOLON (tokenPos yypos yytext));
+<INITIAL>"("	=> (Tokens.LPAREN (tokenPos yypos yytext));
+<INITIAL>")"	=> (Tokens.RPAREN (tokenPos yypos yytext));
+<INITIAL>"["	=> (Tokens.LBRACE (tokenPos yypos yytext));
+<INITIAL>"]"	=> (Tokens.RBRACE (tokenPos yypos yytext));
+<INITIAL>"{"	=> (Tokens.LBRACK (tokenPos yypos yytext));
+<INITIAL>"}"	=> (Tokens.RBRACK (tokenPos yypos yytext));
+<INITIAL>"."	=> (Tokens.DOT (tokenPos yypos yytext));
+<INITIAL>"+"	=> (Tokens.PLUS (tokenPos yypos yytext));
+<INITIAL>"-"	=> (Tokens.MINUS (tokenPos yypos yytext));
+<INITIAL>"*"	=> (Tokens.TIMES (tokenPos yypos yytext));
+<INITIAL>"/"	=> (Tokens.DIVIDE (tokenPos yypos yytext));
+<INITIAL>"="	=> (Tokens.EQ (tokenPos yypos yytext));
+<INITIAL>"<>"	=> (Tokens.NEQ (tokenPos yypos yytext));
+<INITIAL>"<"	=> (Tokens.LT (tokenPos yypos yytext));
+<INITIAL>"<="	=> (Tokens.LE (tokenPos yypos yytext));
+<INITIAL>">"	=> (Tokens.GT (tokenPos yypos yytext));
+<INITIAL>">="	=> (Tokens.GE (tokenPos yypos yytext));
+<INITIAL>"&"	=> (Tokens.AND (tokenPos yypos yytext));
+<INITIAL>"|"	=> (Tokens.OR (tokenPos yypos yytext));
+<INITIAL>":="	=> (Tokens.ASSIGN (tokenPos yypos yytext));
 
-[a-zA-Z][a-zA-Z0-9_]* => (Tokens.ID (tokenPosVal yypos yytext));
-[0-9]+ => (Tokens.INT (intToken yypos yytext));
+<INITIAL>[a-zA-Z][a-zA-Z0-9_]* => (Tokens.ID (tokenPosVal yypos yytext));
+<INITIAL>[0-9]+ => (Tokens.INT (intToken yypos yytext));
 
-.       => (ErrorMsg.error yypos ("illegal character " ^ yytext); continue());
+<INITIAL>.       => (ErrorMsg.error yypos ("illegal character " ^ yytext); continue());
 
