@@ -6,9 +6,12 @@ val linePos = ErrorMsg.linePos
 fun err(p1,p2) = ErrorMsg.error p1
 
 val commentNestingLevel = ref 0
+val stringPos = ref 0
+val string = ref ""
 
 fun checkNesting pos = if !commentNestingLevel > 0 then ErrorMsg.error pos "Expected '*/' but found EOF" else ()
-fun eof() = let val pos = hd(!linePos) in checkNesting pos; Tokens.EOF(pos,pos) end
+fun checkString pos = if !string <> "" then ErrorMsg.error pos "Expected '\"' but found EOF" else ()
+fun eof() = let val pos = hd(!linePos) in checkNesting pos; checkString pos; Tokens.EOF(pos,pos) end
 
 fun getEnd yypos yytext = yypos + (String.size yytext)
 fun getInt yypos string = case (Int.fromString string) of (SOME i) => i | NONE => ErrorMsg.impossible "could not convert string to int"
@@ -16,15 +19,20 @@ fun getInt yypos string = case (Int.fromString string) of (SOME i) => i | NONE =
 fun tokenPos yypos yytext = (yypos, getEnd yypos yytext)
 fun tokenPosVal yypos yytext = (yytext, yypos, getEnd yypos yytext)
 fun intToken yypos yytext = (getInt yypos yytext, yypos, getEnd yypos yytext)
+fun stringToken () = let val s = !string val pos = !stringPos in string := ""; Tokens.STRING (s, pos, (getEnd pos s)) end
 
 %% 
-%s COMMENT;
+%s COMMENT STRING;
 %%
 
 <INITIAL>"/*" => (YYBEGIN COMMENT; commentNestingLevel := !commentNestingLevel + 1; continue());
 <COMMENT>"/*" => (commentNestingLevel := !commentNestingLevel + 1; continue());
 <COMMENT>"*/" => (commentNestingLevel := !commentNestingLevel - 1; if !commentNestingLevel = 0 then YYBEGIN INITIAL else (); continue());
 <COMMENT>. => (continue());
+
+<INITIAL>"\"" => (YYBEGIN STRING; stringPos := yypos + 1; continue());
+<STRING>"\"" => (YYBEGIN INITIAL; stringToken ());
+<STRING>. => (string := !string ^ yytext; continue());
 
 <INITIAL>[ \t]+ => (continue());
 
